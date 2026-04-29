@@ -3,6 +3,15 @@ import { supabase } from '../lib/neon';
 import { useAuthStore } from './authStore';
 import type { Lead, FunilEtapa, CustomField, LeadMessage, Campaign } from '../types';
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string') return message;
+  }
+  return fallback;
+}
+
 interface LeadsState {
   leads: Lead[];
   etapas: FunilEtapa[];
@@ -61,18 +70,14 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('leads')
-        .select(`
-          *,
-          responsible:users!leads_responsible_id_fkey(id, email),
-          etapa:funil_etapas!leads_current_etapa_id_fkey(*)
-        `)
+        .select('*')
         .eq('workspace_id', workspace.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       set({ leads: data || [] });
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Erro ao carregar leads') });
     } finally {
       set({ isLoading: false });
     }
@@ -83,22 +88,14 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('leads')
-        .select(`
-          *,
-          responsible:users!leads_responsible_id_fkey(id, email, name),
-          etapa:funil_etapas!leads_current_etapa_id_fkey(*),
-          custom_fields:lead_field_values(
-            *,
-            custom_field:custom_fields(*)
-          )
-        `)
+        .select('*')
         .eq('id', id)
         .single();
 
       if (error) throw error;
       set({ currentLead: data });
-    } catch (err: any) {
-      set({ error: err.message });
+    } catch (err: unknown) {
+      set({ error: getErrorMessage(err, 'Erro ao carregar lead') });
     } finally {
       set({ isLoading: false });
     }
@@ -244,7 +241,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
 
     const { data, error } = await supabase
       .from('campaigns')
-      .select('*, trigger_etapa:funil_etapas!campaigns_trigger_etapa_id_fkey(*)')
+      .select('*')
       .eq('workspace_id', workspace.id)
       .order('created_at', { ascending: false });
 
@@ -406,7 +403,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
 }));
 
 // Helper functions para geração de mensagens
-function buildPrompt(lead: any, campaign: any): string {
+function buildPrompt(lead: Lead, campaign: Campaign): string {
   const context = campaign.context
     .replace(/\{\{name\}\}/g, lead.name || '')
     .replace(/\{\{company\}\}/g, lead.company || '')
@@ -438,6 +435,6 @@ function parseGeneratedMessages(text: string): { id: string; text: string }[] {
 
   return parts.slice(0, 3).map(part => ({
     id: crypto.randomUUID(),
-    text: part.replace(/^\d+[\)\.]\s*/, '').trim(),
+    text: part.replace(/^\d+[).]\s*/, '').trim(),
   }));
 }

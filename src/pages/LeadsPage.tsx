@@ -111,7 +111,7 @@ function LeadModal({ lead, onClose }: LeadModalProps) {
 
   useEffect(() => {
     if (lead) {
-      setFormData(lead);
+      queueMicrotask(() => setFormData(lead));
     }
   }, [lead]);
 
@@ -120,7 +120,9 @@ function LeadModal({ lead, onClose }: LeadModalProps) {
     try {
       await updateLead(lead.id, formData);
       onClose();
-    } catch {}
+    } catch (err) {
+      console.error('Erro ao salvar lead:', err);
+    }
   };
 
   const handleDelete = async () => {
@@ -318,7 +320,9 @@ function CreateLeadModal({ isOpen, onClose }: CreateLeadModalProps) {
         observations: '',
       });
       onClose();
-    } catch {}
+    } catch (err) {
+      console.error('Erro ao criar lead:', err);
+    }
   };
 
   if (!isOpen) return null;
@@ -449,7 +453,7 @@ export function LeadsPage() {
       loadLeads();
       loadEtapas();
     }
-  }, [workspace]);
+  }, [loadEtapas, loadLeads, workspace]);
 
   const leadsPorEtapa = etapas.map(etapa => ({
     etapa,
@@ -484,8 +488,9 @@ export function LeadsPage() {
     if (targetEtapaId && targetEtapaId !== lead.current_etapa_id) {
       try {
         await moveLead(leadId, targetEtapaId);
-      } catch (err: any) {
-        alert(err.message);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Erro ao mover lead';
+        alert(message);
       }
     }
   };

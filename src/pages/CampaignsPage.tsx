@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, X, Loader2, Zap, Copy, Send, RotateCcw } from 'lucide-react';
 import { useLeadsStore } from '../stores/leadsStore';
 import { useAuthStore } from '../stores/authStore';
-import type { Campaign } from '../types';
+import type { Campaign, FunilEtapa } from '../types';
 
 export function CampaignsPage() {
   const { workspace } = useAuthStore();
@@ -19,7 +19,7 @@ export function CampaignsPage() {
       loadEtapas();
       loadLeads();
     }
-  }, [workspace]);
+  }, [loadCampaigns, loadEtapas, loadLeads, workspace]);
 
   const handleGenerate = async (leadId: string, campaignId: string) => {
     setGeneratingForLead(leadId);
@@ -210,7 +210,7 @@ export function CampaignsPage() {
 }
 
 interface CreateCampaignModalProps {
-  etapas: any[];
+  etapas: FunilEtapa[];
   onClose: () => void;
   onSubmit: (data: Partial<Campaign>) => Promise<void>;
 }

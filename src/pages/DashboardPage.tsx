@@ -9,10 +9,12 @@ export function DashboardPage() {
   const { leads, etapas, campaigns, loadLeads, loadEtapas, loadCampaigns, isLoading } = useLeadsStore();
 
   useEffect(() => {
-    loadLeads();
-    loadEtapas();
-    loadCampaigns();
-  }, [workspace]);
+    if (workspace) {
+      loadLeads();
+      loadEtapas();
+      loadCampaigns();
+    }
+  }, [loadCampaigns, loadEtapas, loadLeads, workspace]);
 
   const leadsPorEtapa = etapas.map(etapa => ({
     ...etapa,

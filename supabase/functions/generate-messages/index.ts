@@ -3,7 +3,6 @@
 // This runs as a frontend API route (not Edge Function since Neon doesn't have those)
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,11 +35,7 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const openrouterApiKey = Deno.env.get('OPENROUTER_API_KEY')!;
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { lead, campaign } = await req.json();
 
@@ -144,7 +139,7 @@ function parseGeneratedMessages(text: string): { id: string; text: string }[] {
   // Take up to 3 messages
   const messages = parts.slice(0, 3).map(part => ({
     id: crypto.randomUUID(),
-    text: part.replace(/^\d+[\)\.]\s*/, '').trim(), // Remove any numbering
+    text: part.replace(/^\d+[).]\s*/, '').trim(), // Remove any numbering
   }));
 
   return messages;

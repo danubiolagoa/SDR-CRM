@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -14,7 +14,13 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   name: z.string().min(2, 'Nome é obrigatório'),
   email: z.string().email('Email inválido'),
-  password: z.string().min(6, 'Mínimo 6 caracteres'),
+  password: z
+    .string()
+    .min(8, 'Mínimo 8 caracteres')
+    .regex(/[A-Z]/, 'Pelo menos 1 letra maiúscula')
+    .regex(/[a-z]/, 'Pelo menos 1 letra minúscula')
+    .regex(/[0-9]/, 'Pelo menos 1 número')
+    .regex(/[\W_]/, 'Pelo menos 1 caractere especial'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Senhas não conferem',
@@ -27,6 +33,7 @@ type RegisterForm = z.infer<typeof registerSchema>;
 export function LoginPage() {
   const [isRegister, setIsRegister] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const navigate = useNavigate();
   const { login, register: registerUser, isLoading, error, clearError } = useAuthStore();
 
@@ -38,18 +45,30 @@ export function LoginPage() {
     resolver: zodResolver(registerSchema),
   });
 
+  const passwordValue = useWatch({
+    control: registerForm.control,
+    name: 'password',
+  }) || '';
+
   const onLogin = async (data: LoginForm) => {
     try {
       await login(data.email, data.password);
       navigate('/');
-    } catch {}
+    } catch (err) {
+      console.error('Erro no login:', err);
+    }
   };
 
   const onRegister = async (data: RegisterForm) => {
     try {
-      await registerUser(data.name, data.email, data.password);
-      navigate('/');
-    } catch {}
+      setRegistrationSuccess(false);
+      const result = await registerUser(data.name, data.email, data.password);
+      if (!result.needsVerification) {
+        navigate('/');
+      }
+    } catch (err) {
+      console.error('Erro no registro:', err);
+    }
   };
 
   return (
@@ -123,6 +142,20 @@ export function LoginPage() {
                 {registerForm.formState.errors.password && (
                   <p className="text-sm text-red-500 mt-1">{registerForm.formState.errors.password.message}</p>
                 )}
+                <div className="mt-2 text-xs text-gray-500 space-y-1">
+                  <p className={passwordValue.match(/[A-Z]/) ? 'text-green-600' : ''}>
+                    {passwordValue.match(/[A-Z]/) ? '✓' : '○'} Pelo menos 1 letra maiúscula
+                  </p>
+                  <p className={passwordValue.match(/[a-z]/) ? 'text-green-600' : ''}>
+                    {passwordValue.match(/[a-z]/) ? '✓' : '○'} Pelo menos 1 letra minúscula
+                  </p>
+                  <p className={passwordValue.match(/[0-9]/) ? 'text-green-600' : ''}>
+                    {passwordValue.match(/[0-9]/) ? '✓' : '○'} Pelo menos 1 número
+                  </p>
+                  <p className={passwordValue.match(/[\W_]/) ? 'text-green-600' : ''}>
+                    {passwordValue.match(/[\W_]/) ? '✓' : '○'} Pelo menos 1 caractere especial
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -146,6 +179,12 @@ export function LoginPage() {
                 {isLoading && <Loader2 size={18} className="animate-spin" />}
                 Criar Conta
               </button>
+
+              {registrationSuccess && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-600">
+                  Conta criada! Faça login para continuar.
+                </div>
+              )}
             </form>
           ) : (
             <form onSubmit={loginForm.handleSubmit(onLogin)} className="space-y-4">
@@ -200,6 +239,7 @@ export function LoginPage() {
               onClick={() => {
                 setIsRegister(!isRegister);
                 clearError();
+                setRegistrationSuccess(false);
               }}
               className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
             >

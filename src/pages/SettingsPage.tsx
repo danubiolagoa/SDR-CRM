@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Settings, Users, Plus, X, Loader2 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { useLeadsStore } from '../stores/leadsStore';
-import type { CustomField } from '../types';
+import type { CustomField, FunilEtapa, Workspace, WorkspaceMember } from '../types';
 
 type Tab = 'geral' | 'membros' | 'funil' | 'campos';
 
@@ -17,7 +17,7 @@ export function SettingsPage() {
       loadCustomFields();
       loadMembers();
     }
-  }, [workspace]);
+  }, [loadCustomFields, loadEtapas, loadMembers, workspace]);
 
   return (
     <div className="space-y-6">
@@ -59,7 +59,7 @@ export function SettingsPage() {
   );
 }
 
-function GeralTab({ workspace }: { workspace: any }) {
+function GeralTab({ workspace }: { workspace: Workspace | null }) {
   const [name, setName] = useState(workspace?.name || '');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -91,7 +91,7 @@ function GeralTab({ workspace }: { workspace: any }) {
   );
 }
 
-function MembrosTab({ members }: { members: any[] }) {
+function MembrosTab({ members }: { members: WorkspaceMember[] }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Membros do Workspace</h2>
@@ -125,7 +125,7 @@ function MembrosTab({ members }: { members: any[] }) {
   );
 }
 
-function FunilTab({ etapas }: { etapas: any[] }) {
+function FunilTab({ etapas }: { etapas: FunilEtapa[] }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Etapas do Funil</h2>
@@ -253,7 +253,7 @@ function CreateFieldModal({ onClose, onSubmit }: CreateFieldModalProps) {
             <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
             <select
               value={fieldType}
-              onChange={(e) => setFieldType(e.target.value as any)}
+              onChange={(e) => setFieldType(e.target.value as CustomField['field_type'])}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             >
               <option value="text">Texto</option>
