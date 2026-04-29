@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "supabase-sdr-crm": {
+      "command": "C:\\Users\\danub\\.codex\\memories\\supabase-sdr-crm-server.cmd",
+      "args": []
+    }
+  }
+}

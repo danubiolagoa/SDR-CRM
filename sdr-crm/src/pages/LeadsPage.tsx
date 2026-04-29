@@ -1,0 +1,552 @@
+import { useEffect, useState } from 'react';
+import { DndContext, DragOverlay, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Plus, X, GripVertical, Loader2 } from 'lucide-react';
+import { useLeadsStore } from '../stores/leadsStore';
+import { useAuthStore } from '../stores/authStore';
+import type { Lead, FunilEtapa } from '../types';
+
+const ETAPA_COLORS: Record<string, string> = {
+  'Base': 'bg-slate-500',
+  'Lead Mapeado': 'bg-blue-500',
+  'Tentando Contato': 'bg-amber-500',
+  'Conexão Iniciada': 'bg-violet-500',
+  'Desqualificado': 'bg-red-500',
+  'Qualificado': 'bg-emerald-500',
+  'Reunião Agendada': 'bg-cyan-500',
+};
+
+interface LeadCardProps {
+  lead: Lead;
+  onClick: () => void;
+}
+
+function LeadCard({ lead, onClick }: LeadCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: lead.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const etapaColor = ETAPA_COLORS[lead.etapa?.name || ''] || 'bg-gray-500';
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="bg-white border border-gray-200 rounded-lg p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
+      onClick={onClick}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-gray-900 truncate">{lead.name}</p>
+          <p className="text-sm text-gray-500 truncate">{lead.company || 'Sem empresa'}</p>
+        </div>
+        <GripVertical size={16} className="text-gray-300 flex-shrink-0 ml-2" />
+      </div>
+      <div className="flex items-center justify-between mt-2">
+        <span className={`text-xs px-2 py-0.5 rounded-full text-white ${etapaColor}`}>
+          {lead.etapa?.name || 'Sem etapa'}
+        </span>
+        {lead.responsible && (
+          <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center">
+            <span className="text-xs text-indigo-600 font-medium">
+              {lead.responsible.name?.charAt(0) || lead.responsible.email?.charAt(0) || '?'}
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface KanbanColumnProps {
+  etapa: FunilEtapa;
+  leads: Lead[];
+  onLeadClick: (lead: Lead) => void;
+}
+
+function KanbanColumn({ etapa, leads, onLeadClick }: KanbanColumnProps) {
+  const colorClass = ETAPA_COLORS[etapa.name] || 'bg-gray-500';
+
+  return (
+    <div className="flex-shrink-0 w-72">
+      <div className="bg-gray-100 rounded-lg p-3">
+        <div className="flex items-center gap-2 mb-3">
+          <div className={`w-3 h-3 rounded-full ${colorClass}`} />
+          <h3 className="font-medium text-gray-900 text-sm">{etapa.name}</h3>
+          <span className="text-xs text-gray-500 ml-auto bg-white px-2 py-0.5 rounded-full">
+            {leads.length}
+          </span>
+        </div>
+        <SortableContext items={leads.map(l => l.id)} strategy={verticalListSortingStrategy}>
+          <div className="space-y-2 min-h-[200px]">
+            {leads.map((lead) => (
+              <LeadCard key={lead.id} lead={lead} onClick={() => onLeadClick(lead)} />
+            ))}
+          </div>
+        </SortableContext>
+      </div>
+    </div>
+  );
+}
+
+interface LeadModalProps {
+  lead: Lead | null;
+  onClose: () => void;
+}
+
+function LeadModal({ lead, onClose }: LeadModalProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState<Partial<Lead>>({});
+  const { updateLead, deleteLead, isLoading } = useLeadsStore();
+
+  useEffect(() => {
+    if (lead) {
+      setFormData(lead);
+    }
+  }, [lead]);
+
+  const handleSave = async () => {
+    if (!lead) return;
+    try {
+      await updateLead(lead.id, formData);
+      onClose();
+    } catch {}
+  };
+
+  const handleDelete = async () => {
+    if (!lead) return;
+    if (confirm('Tem certeza que deseja excluir este lead?')) {
+      await deleteLead(lead.id);
+      onClose();
+    }
+  };
+
+  if (!lead) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {isEditing ? 'Editar Lead' : 'Detalhes do Lead'}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {isEditing ? (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome</label>
+                <input
+                  value={formData.name || ''}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  value={formData.email || ''}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+                <input
+                  value={formData.phone || ''}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
+                <input
+                  value={formData.company || ''}
+                  onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
+                <input
+                  value={formData.job_title || ''}
+                  onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Origem</label>
+                <select
+                  value={formData.source || ''}
+                  onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Selecione...</option>
+                  <option value="orgânica">Orgânica</option>
+                  <option value="indicação">Indicação</option>
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="frio">Frio</option>
+                  <option value="outro">Outro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+                <textarea
+                  value={formData.observations || ''}
+                  onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={handleSave}
+                  disabled={isLoading}
+                  className="flex-1 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {isLoading ? <Loader2 className="animate-spin mx-auto" size={18} /> : 'Salvar'}
+                </button>
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">Nome</p>
+                  <p className="font-medium text-gray-900">{lead.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Email</p>
+                  <p className="font-medium text-gray-900">{lead.email || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Telefone</p>
+                  <p className="font-medium text-gray-900">{lead.phone || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Empresa</p>
+                  <p className="font-medium text-gray-900">{lead.company || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Cargo</p>
+                  <p className="font-medium text-gray-900">{lead.job_title || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Origem</p>
+                  <p className="font-medium text-gray-900">{lead.source || '-'}</p>
+                </div>
+              </div>
+
+              {lead.observations && (
+                <div>
+                  <p className="text-xs text-gray-500">Observações</p>
+                  <p className="text-gray-700 mt-1">{lead.observations}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="flex-1 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                >
+                  Excluir
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface CreateLeadModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+function CreateLeadModal({ isOpen, onClose }: CreateLeadModalProps) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    job_title: '',
+    source: '',
+    observations: '',
+  });
+  const { createLead, isLoading } = useLeadsStore();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await createLead(formData);
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        company: '',
+        job_title: '',
+        source: '',
+        observations: '',
+      });
+      onClose();
+    } catch {}
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-md">
+        <div className="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Novo Lead</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+            <X size={20} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
+            <input
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              type="email"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Telefone</label>
+            <input
+              value={formData.phone}
+              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Empresa</label>
+            <input
+              value={formData.company}
+              onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
+            <input
+              value={formData.job_title}
+              onChange={(e) => setFormData({ ...formData, job_title: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Origem</label>
+            <select
+              value={formData.source}
+              onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="">Selecione...</option>
+              <option value="orgânica">Orgânica</option>
+              <option value="indicação">Indicação</option>
+              <option value="linkedin">LinkedIn</option>
+              <option value="frio">Frio</option>
+              <option value="outro">Outro</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Observações</label>
+            <textarea
+              value={formData.observations}
+              onChange={(e) => setFormData({ ...formData, observations: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              rows={3}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="flex-1 py-2.5 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {isLoading ? <Loader2 className="animate-spin mx-auto" size={18} /> : 'Criar Lead'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export function LeadsPage() {
+  const { workspace } = useAuthStore();
+  const { leads, etapas, loadLeads, loadEtapas, moveLead, error } = useLeadsStore();
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
+
+  useEffect(() => {
+    if (workspace) {
+      loadLeads();
+      loadEtapas();
+    }
+  }, [workspace]);
+
+  const leadsPorEtapa = etapas.map(etapa => ({
+    etapa,
+    leads: leads.filter(l => l.current_etapa_id === etapa.id),
+  }));
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const leadId = active.id as string;
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return;
+
+    // Encontrar a etapa de destino
+    let targetEtapaId: string | null = null;
+
+    // Verificar se soltou sobre uma coluna
+    const overEtapa = etapas.find(e => e.id === over.id);
+    if (overEtapa) {
+      targetEtapaId = overEtapa.id;
+    } else {
+      // Soltou sobre outro lead - usar a etapa desse lead
+      const overLead = leads.find(l => l.id === over.id);
+      if (overLead) {
+        targetEtapaId = overLead.current_etapa_id;
+      }
+    }
+
+    if (targetEtapaId && targetEtapaId !== lead.current_etapa_id) {
+      try {
+        await moveLead(leadId, targetEtapaId);
+      } catch (err: any) {
+        alert(err.message);
+      }
+    }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const activeLead = activeId ? leads.find(l => l.id === activeId) : null;
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
+          <p className="text-gray-500 mt-1">Arraste os cards para mover entre etapas</p>
+        </div>
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          <Plus size={18} />
+          Novo Lead
+        </button>
+      </div>
+
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+          {error}
+        </div>
+      )}
+
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          {leadsPorEtapa.map(({ etapa, leads: etapaLeads }) => (
+            <KanbanColumn
+              key={etapa.id}
+              etapa={etapa}
+              leads={etapaLeads}
+              onLeadClick={setSelectedLead}
+            />
+          ))}
+        </div>
+
+        <DragOverlay>
+          {activeLead && (
+            <div className="bg-white border border-indigo-200 rounded-lg p-3 shadow-xl opacity-90">
+              <p className="font-medium text-gray-900">{activeLead.name}</p>
+              <p className="text-sm text-gray-500">{activeLead.company || 'Sem empresa'}</p>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
+
+      <LeadModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
+      <CreateLeadModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+    </div>
+  );
+}
