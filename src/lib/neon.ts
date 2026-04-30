@@ -1,7 +1,11 @@
 import { createClient } from '@neondatabase/neon-js';
 
-const neonAuthUrl = import.meta.env.VITE_NEON_AUTH_URL || '';
-const neonDataApiUrl = import.meta.env.VITE_NEON_DATA_API_URL || '';
+function normalizeNeonUrl(url: string) {
+  return url.replace('.neon.build/', '.neon.tech/');
+}
+
+const neonAuthUrl = normalizeNeonUrl(import.meta.env.VITE_NEON_AUTH_URL || '');
+const neonDataApiUrl = normalizeNeonUrl(import.meta.env.VITE_NEON_DATA_API_URL || '');
 
 export const supabase = createClient({
   auth: {
