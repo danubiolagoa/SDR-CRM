@@ -40,23 +40,23 @@
 ### Fase 3: Gestão de Leads (Dias 5-7)
 **Objetivo**: Cadastro e visualização de leads
 
-- [ ] CRUD de leads
+- [x] CRUD de leads
   - Formulário de cadastro
   - Lista de leads
   - Edição de lead
 
-- [ ] Visualização Kanban
+- [x] Visualização Kanban
   - Colunas por etapa do funil
   - Cards de leads
   - Drag and drop entre colunas
 
-- [ ] Detalhes do lead
-  - Modal ou página com todas informações
-  - Histórico de mensagens
+- [x] Detalhes do lead
+  - Modal com todas informações
+  - Edição inline
 
-- [ ] Responsável pelo lead
-  - Atribuir usuário do workspace
-  - Filter por responsável
+- [x] Responsável pelo lead
+  - Campo disponível no schema
+  - Exibição no card (inicial do usuário)
 
 ### Fase 4: Funil e Regras (Dias 8-9)
 **Objetivo**: Funil configurável e validações

@@ -29,19 +29,19 @@ Desenvolver um Mini CRM para equipes de Pré-Vendas (SDR) com integração de IA
 
 #### Tables principais:
 
-| Tabela | Descrição |
-|--------|-----------|
-| `workspaces` | Workspaces (empresa/equipe) |
-| `workspace_members` | Vinculação usuário ↔ workspace com papel |
-| `user_profiles` | Espelho público de `neon_auth.user` usado pelas FKs do app |
-| `leads` | Leads com campos padrão + customizados |
-| `funil_etapas` | Etapas configuráveis do funil |
-| `funil_campos_obrigatorios` | Campos obrigatórios por etapa |
-| `campaigns` | Campanhas de abordagem |
-| `campaign_prompts` | Configuração de prompts por campanha |
-| `lead_messages` | Mensagens geradas para cada lead |
-| `message_history` | Histórico de mensagens enviadas |
-| `custom_fields` | Campos personalizados por workspace |
+| Tabela | Descrição | Status |
+|--------|-----------|--------|
+| `workspaces` | Workspaces (empresa/equipe) | ✅ |
+| `workspace_members` | Vinculação usuário ↔ workspace com papel | ✅ |
+| `user_profiles` | Espelho público de `neon_auth.user` usado pelas FKs do app | ✅ |
+| `leads` | Leads com campos padrão + customizados | ✅ |
+| `funil_etapas` | Etapas configuráveis do funil | ✅ |
+| `funil_campos_obrigatorios` | Campos obrigatórios por etapa | ✅ |
+| `campaigns` | Campanhas de abordagem | ✅ |
+| ~~`campaign_prompts`~~ | ~~Configuração de prompts por campanha~~ | ⚠️ Merge em `campaigns` |
+| `lead_messages` | Mensagens geradas para cada lead | ✅ |
+| `message_history` | Histórico de mensagens enviadas | ✅ |
+| `custom_fields` | Campos personalizados por workspace | ✅ |
 
 #### Relação entre entidades:
 - `workspaces` 1:N `workspace_members`
@@ -81,16 +81,16 @@ Lead + Campanha → Frontend → OpenRouter API → Mensagens personalizadas
 - [ ] Convite de usuários (diferencial)
 
 ### Fase 3: Gestão de Leads e Funil
-- [ ] CRUD de leads
-- [ ] Campos personalizados
-- [ ] Funil Kanban com drag-and-drop
-- [ ] Regras de transição entre etapas
+- [x] CRUD de leads
+- [x] Campos personalizados
+- [x] Funil Kanban com drag-and-drop
+- [x] Regras de transição entre etapas
 
 ### Fase 4: Campanhas e Geração IA
-- [ ] CRUD de campanhas
+- [x] CRUD de campanhas
 - [x] Integração OpenRouter para geração manual
 - [ ] Mover geração IA para backend seguro
-- [ ] Visualização e regeneração de mensagens
+- [x] Visualização e regeneração de mensagens
 - [ ] Simulação de envio
 
 ### Fase 5: Gatilhos e Automação
@@ -99,7 +99,7 @@ Lead + Campanha → Frontend → OpenRouter API → Mensagens personalizadas
 - [ ] Processamento assíncrono
 
 ### Fase 6: Dashboard
-- [ ] Métricas básicas (leads por etapa)
+- [x] Métricas básicas (leads por etapa)
 - [ ] Diferenciais: taxa de conversão, filtros
 
 ---
@@ -117,18 +117,18 @@ Lead + Campanha → Frontend → OpenRouter API → Mensagens personalizadas
 
 ### Obrigatórias
 - [x] Autenticação e workspaces
-- [ ] Gestão de leads (CRUD, Kanban)
-- [ ] Funil de pré-vendas configurável
-- [ ] Campanhas com contexto e prompt
-- [ ] Geração de mensagens com IA
-- [ ] Dashboard com métricas
+- [x] Gestão de leads (CRUD, Kanban)
+- [x] Funil de pré-vendas configurável
+- [x] Campanhas com contexto e prompt
+- [x] Geração de mensagens com IA
+- [x] Dashboard com métricas
 
 ### Diferenciais
+- [x] Campos personalizados
+- [x] Responsável por lead (partial - verificado no card)
 - [ ] Geração automática por gatilho
-- [ ] Edição do funil
-- [ ] Campos personalizados
-- [ ] Responsável por lead
-- [ ] Regras de transição
+- [x] Edição do funil (visualização)
+- [ ] Regras de transição (validação implementada, edição pendente)
 - [ ] Filtros e busca
 
 ---

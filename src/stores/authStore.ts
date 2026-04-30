@@ -1,16 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/neon';
+import { DEFAULT_ETAPA_COLORS } from '../lib/etapaColors';
 import type { User, Workspace, WorkspaceMember } from '../types';
 
 const DEFAULT_ETAPAS = [
-  { name: 'Base', position: 0, is_default: true },
-  { name: 'Lead Mapeado', position: 1, is_default: false },
-  { name: 'Tentando Contato', position: 2, is_default: false },
-  { name: 'Conexão Iniciada', position: 3, is_default: false },
-  { name: 'Desqualificado', position: 4, is_default: false },
-  { name: 'Qualificado', position: 5, is_default: false },
-  { name: 'Reunião Agendada', position: 6, is_default: false },
+  { name: 'Base', position: 0, is_default: true, color: DEFAULT_ETAPA_COLORS[0] },
+  { name: 'Lead Mapeado', position: 1, is_default: false, color: DEFAULT_ETAPA_COLORS[1] },
+  { name: 'Tentando Contato', position: 2, is_default: false, color: DEFAULT_ETAPA_COLORS[2] },
+  { name: 'Conexão Iniciada', position: 3, is_default: false, color: DEFAULT_ETAPA_COLORS[3] },
+  { name: 'Desqualificado', position: 4, is_default: false, color: DEFAULT_ETAPA_COLORS[4] },
+  { name: 'Qualificado', position: 5, is_default: false, color: DEFAULT_ETAPA_COLORS[5] },
+  { name: 'Reunião Agendada', position: 6, is_default: false, color: DEFAULT_ETAPA_COLORS[6] },
 ];
 
 type AuthUser = {
@@ -60,6 +61,8 @@ interface AuthState {
   loadWorkspaces: () => Promise<void>;
   selectWorkspace: (workspace: Workspace) => Promise<void>;
   loadMembers: () => Promise<void>;
+  addMember: (email: string, role: 'admin' | 'member') => Promise<void>;
+  removeMember: (memberId: string) => Promise<void>;
   createDefaultWorkspace: (userName: string) => Promise<void>;
   ensureUserProfile: (user: User) => Promise<void>;
   ensureDefaultEtapas: (workspaceId: string) => Promise<void>;
@@ -266,6 +269,54 @@ export const useAuthStore = create<AuthState>()(
         })) || [];
 
         set({ members: (members as unknown as WorkspaceMember[]) });
+      },
+
+      addMember: async (email: string, role: 'admin' | 'member') => {
+        const { workspace } = get();
+        if (!workspace) throw new Error('No workspace selected');
+
+        // Find user by email
+        const { data: userProfile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('email', email)
+          .single();
+
+        if (profileError || !userProfile) {
+          throw new Error('Usuário não encontrado. O usuário precisa estar cadastrado no sistema.');
+        }
+
+        // Check if already a member
+        const { data: existingMember } = await supabase
+          .from('workspace_members')
+          .select('*')
+          .eq('workspace_id', workspace.id)
+          .eq('user_id', userProfile.id)
+          .single();
+
+        if (existingMember) {
+          throw new Error('Este usuário já é membro do workspace.');
+        }
+
+        // Add member
+        const { error: addError } = await supabase.from('workspace_members').insert({
+          workspace_id: workspace.id,
+          user_id: userProfile.id,
+          role,
+        });
+
+        if (addError) throw addError;
+        await get().loadMembers();
+      },
+
+      removeMember: async (memberId: string) => {
+        const { error } = await supabase
+          .from('workspace_members')
+          .delete()
+          .eq('id', memberId);
+
+        if (error) throw error;
+        await get().loadMembers();
       },
 
       createDefaultWorkspace: async (userName: string) => {

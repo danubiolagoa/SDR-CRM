@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/neon';
 import { useAuthStore } from './authStore';
+import { DEFAULT_ETAPA_COLORS, getDefaultEtapaColorKey } from '../lib/etapaColors';
 import type { Lead, FunilEtapa, CustomField, LeadMessage, Campaign } from '../types';
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -32,6 +33,10 @@ interface LeadsState {
 
   // Etapa actions
   loadEtapas: () => Promise<void>;
+  createEtapa: (etapa: Partial<FunilEtapa>) => Promise<void>;
+  updateEtapa: (id: string, data: Partial<FunilEtapa>) => Promise<void>;
+  deleteEtapa: (id: string) => Promise<void>;
+  reorderEtapas: (etapas: FunilEtapa[]) => Promise<void>;
 
   // Custom fields actions
   loadCustomFields: () => Promise<void>;
@@ -70,7 +75,10 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
     try {
       const { data, error } = await supabase
         .from('leads')
-        .select('*')
+        .select(`
+          *,
+          etapa:funil_etapas(*)
+        `)
         .eq('workspace_id', workspace.id)
         .order('created_at', { ascending: false });
 
@@ -199,7 +207,87 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       .order('position');
 
     if (error) throw error;
-    set({ etapas: data || [] });
+
+    const etapas = (data || []) as FunilEtapa[];
+    const shouldBackfillDefaultColors =
+      etapas.length > 1 &&
+      etapas.every(etapa => !etapa.color || etapa.color === DEFAULT_ETAPA_COLORS[0]);
+
+    if (shouldBackfillDefaultColors) {
+      const etapasWithColors = etapas.map((etapa, index) => ({
+        ...etapa,
+        color: getDefaultEtapaColorKey(etapa.position ?? index),
+      }));
+
+      await Promise.all(
+        etapasWithColors.map(etapa =>
+          supabase.from('funil_etapas').update({ color: etapa.color }).eq('id', etapa.id)
+        )
+      );
+
+      set({ etapas: etapasWithColors });
+      return;
+    }
+
+    set({ etapas });
+  },
+
+  createEtapa: async (etapa) => {
+    const { workspace } = useAuthStore.getState();
+    if (!workspace) return;
+
+    const { error } = await supabase.from('funil_etapas').insert({
+      ...etapa,
+      workspace_id: workspace.id,
+    });
+
+    if (error) throw error;
+    await get().loadEtapas();
+  },
+
+  updateEtapa: async (id, data) => {
+    const { error, status } = await supabase
+      .from('funil_etapas')
+      .update(data)
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Erro ${status}: ${error.message}`);
+    }
+    await get().loadEtapas();
+  },
+
+  deleteEtapa: async (id) => {
+    // Move leads to default etapa before deleting
+    const { workspace } = useAuthStore.getState();
+    if (!workspace) return;
+
+    const { data: defaultEtapa } = await supabase
+      .from('funil_etapas')
+      .select('id')
+      .eq('workspace_id', workspace.id)
+      .eq('is_default', true)
+      .single();
+
+    if (defaultEtapa) {
+      await supabase
+        .from('leads')
+        .update({ current_etapa_id: defaultEtapa.id })
+        .eq('current_etapa_id', id);
+    }
+
+    const { error } = await supabase.from('funil_etapas').delete().eq('id', id);
+    if (error) throw error;
+    await get().loadEtapas();
+    await get().loadLeads();
+  },
+
+  reorderEtapas: async (etapas) => {
+    const updates = etapas.map((etapa, index) =>
+      supabase.from('funil_etapas').update({ position: index }).eq('id', etapa.id)
+    );
+    await Promise.all(updates);
+    await get().loadEtapas();
   },
 
   loadCustomFields: async () => {
@@ -290,6 +378,11 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   },
 
   generateMessages: async (leadId, campaignId) => {
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+    if (!apiKey) {
+      throw new Error('API key do OpenRouter não configurada. Adicione VITE_OPENROUTER_API_KEY no arquivo .env.local');
+    }
+
     set({ isLoading: true });
 
     try {
@@ -319,7 +412,7 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
           'X-Title': 'SDR CRM Message Generator',
         },
         body: JSON.stringify({
-          model: 'anthropic/claude-3-haiku-20240307',
+          model: 'minimax/minimax-m2.7',
           messages: [
             {
               role: 'system',
@@ -335,9 +428,14 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         }),
       });
 
-      if (!response.ok) throw new Error('Erro ao gerar mensagens com IA');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error?.message || `Erro HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(errorMsg);
+      }
 
       const data = await response.json();
+      // O content já vem correto do OpenRouter
       const generatedText = data.choices?.[0]?.message?.content || '';
       const messages = parseGeneratedMessages(generatedText);
 
@@ -404,11 +502,18 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
 
 // Helper functions para geração de mensagens
 function buildPrompt(lead: Lead, campaign: Campaign): string {
-  const context = campaign.context
-    .replace(/\{\{name\}\}/g, lead.name || '')
-    .replace(/\{\{company\}\}/g, lead.company || '')
-    .replace(/\{\{job_title\}\}/g, lead.job_title || '')
-    .replace(/\{\{email\}\}/g, lead.email || '');
+  // Substituir apenas uma tag # hashtag no contexto
+  const context = (campaign.context || '')
+    .replace(/#nome/gi, lead.name || '')
+    .replace(/#name/gi, lead.name || '')
+    .replace(/#empresa/gi, lead.company || '')
+    .replace(/#company/gi, lead.company || '')
+    .replace(/#cargo/gi, lead.job_title || '')
+    .replace(/#job_title/gi, lead.job_title || '')
+    .replace(/#email/gi, lead.email || '')
+    .replace(/#telefone/gi, lead.phone || '')
+    .replace(/#phone/gi, lead.phone || '')
+    .replace(/#origem/gi, lead.source || '');
 
   return `${campaign.prompt_instructions}
 
@@ -423,14 +528,18 @@ Dados do Lead:
 - Telefone: ${lead.phone || 'N/A'}
 - Origem: ${lead.source || 'N/A'}
 
-Gere exatamente 3 mensagens diferentes, cada uma com no máximo 150 caracteres. Separe cada mensagem com "---" na linha单独. Não inclua numeração ou títulos.`;
+Gere exatamente 3 mensagens diferentes para abordagem fria B2B em português brasileiro. Cada mensagem deve ter entre 150-280 caracteres. Separe cada mensagem com "---" em uma linha separada. Não inclua numeração ou títulos. Escreva mensagens personalizadas e humanizadas que gerem curiosidade.`;
 }
 
 function parseGeneratedMessages(text: string): { id: string; text: string }[] {
-  const parts = text.split('---').map(s => s.trim()).filter(s => s.length > 0);
+  // Normalizar: remover quebras de linha extras ao redor do ---
+  const normalized = text.replace(/\n\s*\n\s*---/g, '\n---\n').replace(/---\n\s*\n/g, '---\n');
+  const parts = normalized.split('---').map(s => s.trim()).filter(s => s.length > 0);
 
-  if (parts.length === 0) {
-    return [{ id: crypto.randomUUID(), text: text.trim() }];
+  if (parts.length === 0 || parts.length === 1) {
+    // Se só tem uma parte ou nenhuma, retornar o texto como está
+    const cleanText = text.replace(/^[\s\n]+|[\s\n]+$/g, '').trim();
+    return [{ id: crypto.randomUUID(), text: cleanText }];
   }
 
   return parts.slice(0, 3).map(part => ({
