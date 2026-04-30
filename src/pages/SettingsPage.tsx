@@ -82,12 +82,20 @@ export function SettingsPage() {
 }
 
 function GeralTab({ workspace }: { workspace: Workspace | null }) {
-  const [name, setName] = useState(workspace?.name || '');
+  const [name, setName] = useState(workspace?.name ?? '');
   const [isSaving, setIsSaving] = useState(false);
+  const { updateWorkspace } = useAuthStore();
 
   const handleSave = async () => {
+    if (!workspace) return;
     setIsSaving(true);
-    setTimeout(() => setIsSaving(false), 1000);
+    try {
+      await updateWorkspace(workspace.id, name);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Erro ao salvar');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

@@ -3,26 +3,30 @@
 ## Visão Geral
 
 Mini CRM para equipes SDR com geração de mensagens via IA.
+Multi-tenancy com workspaces isolados, pipeline visual Kanban e integração com OpenRouter.
 
 ## Stack Tecnológica
 
 | Camada | Tecnologia |
 |--------|------------|
-| Frontend | React + TypeScript + Vite + Tailwind (via Claude Code) |
-| Backend | Neon PostgreSQL + API Routes |
-| Database | Neon PostgreSQL |
-| Auth | Neon Auth + Better Auth via `@neondatabase/neon-js` |
-| IA | OpenRouter (Claude, Gemini, Llama, etc) |
-| Deploy | Vercel / Netlify |
+| Frontend | React 19 + TypeScript + Vite + Tailwind CSS 4 + Framer Motion |
+| State | Zustand com persistência localStorage |
+| Backend | Neon PostgreSQL (serverless) |
+| Auth | Neon Auth (Better Auth) via `@neondatabase/neon-js` |
+| IA | OpenRouter API (Minimax M2.7) |
+| Build | Vite + TypeScript |
 
 ## Estado Atual da Aplicação
 
-- Login e cadastro usam Neon Auth.
-- O frontend faz bootstrap idempotente de `user_profiles`, workspace padrão, membership admin e etapas padrão.
-- A migration `supabase/migrations/002_neon_auth_bootstrap.sql` registra o trigger de sincronização entre `neon_auth.user` e `public.user_profiles`.
+- Login e cadastro usam Neon Auth via `@neondatabase/neon-js`.
+- Bootstrap idempotente: `user_profiles`, workspace padrão, membership admin e 7 etapas do funil.
+- A migration `supabase/migrations/002_neon_auth_bootstrap.sql` registra o trigger de sincronização.
+- O app evita loop infinito quando há usuário sem workspace e mostra uma ação de recuperação.
+- RLS (Row Level Security) ativo em todas as tabelas públicas.
+- Campos customizados renderizados nos formulários de criação/edição de leads.
+- Nome do workspace persistente nas configurações.
 - O projeto Neon validado é `plain-rain-34001082`.
 - `npm run lint` e `npm run build` passam.
-- RLS ainda não está ativo nas tabelas públicas; o Data API usa permissões `GRANT` enquanto as policies definitivas não são implementadas.
 
 ## Estrutura do Banco de Dados
 

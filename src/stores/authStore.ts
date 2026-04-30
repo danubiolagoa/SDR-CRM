@@ -60,6 +60,7 @@ interface AuthState {
   logout: () => Promise<void>;
   loadWorkspaces: () => Promise<void>;
   selectWorkspace: (workspace: Workspace) => Promise<void>;
+  updateWorkspace: (id: string, name: string) => Promise<void>;
   loadMembers: () => Promise<void>;
   addMember: (email: string, role: 'admin' | 'member') => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
@@ -236,6 +237,24 @@ export const useAuthStore = create<AuthState>()(
         set({ workspace });
         await get().ensureDefaultEtapas(workspace.id);
         await get().loadMembers();
+      },
+
+      updateWorkspace: async (id, name) => {
+        const { error } = await supabase
+          .from('workspaces')
+          .update({ name, updated_at: new Date().toISOString() })
+          .eq('id', id);
+
+        if (error) throw error;
+
+        set(state => ({
+          workspace: state.workspace?.id === id
+            ? { ...state.workspace, name }
+            : state.workspace,
+          workspaces: state.workspaces.map(w =>
+            w.id === id ? { ...w, name } : w
+          ),
+        }));
       },
 
       loadMembers: async () => {

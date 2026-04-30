@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useLeadsStore } from '../stores/leadsStore';
 import { useAuthStore } from '../stores/authStore';
 import { getEtapaColorHex } from '../lib/etapaColors';
+import type { CustomField } from '../types';
 
 function DroppableColumn({ etapaId, children, isOver }: { etapaId: string; children: React.ReactNode; isOver: boolean }) {
   const { setNodeRef } = useDroppable({ id: etapaId });
@@ -115,9 +116,10 @@ function KanbanColumn({ etapa, leads, onLeadClick, isOver }: KanbanColumnProps) 
 interface LeadModalProps {
   lead: { id: string; name: string; email?: string; phone?: string; company?: string; job_title?: string; source?: string; observations?: string } | null;
   onClose: () => void;
+  customFields?: CustomField[];
 }
 
-function LeadModal({ lead, onClose }: LeadModalProps) {
+function LeadModal({ lead, onClose, customFields = [] }: LeadModalProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(lead ?? { name: '', email: '', phone: '', company: '', job_title: '', source: '', observations: '' });
   const { updateLead, deleteLead, isLoading } = useLeadsStore();
@@ -206,6 +208,54 @@ function LeadModal({ lead, onClose }: LeadModalProps) {
                   />
                 </div>
               </div>
+              {customFields.length > 0 && (
+                <div className="border-t border-gray-100 pt-4 mt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Campos Personalizados</h3>
+                  <div className="space-y-3">
+                    {customFields.map((field) => (
+                      <div key={field.id}>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{field.name}</label>
+                        {field.field_type === 'text' && (
+                          <input
+                            type="text"
+                            value={(formData as Record<string, string>)[field.name] || ''}
+                            onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          />
+                        )}
+                        {field.field_type === 'number' && (
+                          <input
+                            type="number"
+                            value={(formData as Record<string, string>)[field.name] || ''}
+                            onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          />
+                        )}
+                        {field.field_type === 'date' && (
+                          <input
+                            type="date"
+                            value={(formData as Record<string, string>)[field.name] || ''}
+                            onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          />
+                        )}
+                        {field.field_type === 'select' && (
+                          <select
+                            value={(formData as Record<string, string>)[field.name] || ''}
+                            onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          >
+                            <option value="">Selecione...</option>
+                            {field.options.map((option) => (
+                              <option key={option} value={option}>{option}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="flex gap-3 pt-4">
                 <button
                   onClick={handleSave}
@@ -273,10 +323,11 @@ function LeadModal({ lead, onClose }: LeadModalProps) {
 interface CreateLeadModalProps {
   isOpen: boolean;
   onClose: () => void;
+  customFields?: CustomField[];
 }
 
-function CreateLeadModal({ isOpen, onClose }: CreateLeadModalProps) {
-  const [formData, setFormData] = useState({
+function CreateLeadModal({ isOpen, onClose, customFields = [] }: CreateLeadModalProps) {
+  const [formData, setFormData] = useState<Record<string, string>>({
     name: '',
     email: '',
     phone: '',
@@ -372,6 +423,54 @@ function CreateLeadModal({ isOpen, onClose }: CreateLeadModalProps) {
               <option value="outro">Outro</option>
             </select>
           </div>
+          {customFields.length > 0 && (
+            <div className="border-t border-gray-100 pt-4 mt-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Campos Personalizados</h3>
+              <div className="space-y-3">
+                {customFields.map((field) => (
+                  <div key={field.id}>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">{field.name}</label>
+                    {field.field_type === 'text' && (
+                      <input
+                        type="text"
+                        value={formData[field.name] || ''}
+                        onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    )}
+                    {field.field_type === 'number' && (
+                      <input
+                        type="number"
+                        value={formData[field.name] || ''}
+                        onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    )}
+                    {field.field_type === 'date' && (
+                      <input
+                        type="date"
+                        value={formData[field.name] || ''}
+                        onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    )}
+                    {field.field_type === 'select' && (
+                      <select
+                        value={formData[field.name] || ''}
+                        onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      >
+                        <option value="">Selecione...</option>
+                        {field.options.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex gap-3 pt-4">
             <button
               type="submit"
@@ -396,7 +495,7 @@ function CreateLeadModal({ isOpen, onClose }: CreateLeadModalProps) {
 
 export function LeadsPage() {
   const { workspace } = useAuthStore();
-  const { leads, etapas, loadLeads, loadEtapas, moveLead, error } = useLeadsStore();
+  const { leads, etapas, customFields, loadLeads, loadEtapas, loadCustomFields, moveLead, error } = useLeadsStore();
   const [selectedLead, setSelectedLead] = useState<LeadCardProps['lead'] | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -410,8 +509,9 @@ export function LeadsPage() {
     if (workspace) {
       loadLeads();
       loadEtapas();
+      loadCustomFields();
     }
-  }, [workspace, loadLeads, loadEtapas]);
+  }, [workspace, loadLeads, loadEtapas, loadCustomFields]);
 
   const leadsPorEtapa = etapas.map(etapa => ({
     etapa,
@@ -511,8 +611,8 @@ export function LeadsPage() {
         </DragOverlay>
       </DndContext>
 
-      <LeadModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
-      <CreateLeadModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} />
+      <LeadModal lead={selectedLead} onClose={() => setSelectedLead(null)} customFields={customFields} />
+      <CreateLeadModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} customFields={customFields} />
     </div>
   );
 }
