@@ -27,7 +27,12 @@ type ProfileRow = {
 };
 
 function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    if (error.message === 'Failed to fetch') {
+      return 'Não foi possível conectar ao Neon Auth. Verifique se o domínio do Vercel está liberado no Neon Auth e se as variáveis VITE_NEON_AUTH_URL e VITE_NEON_DATA_API_URL estão configuradas no deploy.';
+    }
+    return error.message;
+  }
   if (typeof error === 'object' && error !== null && 'message' in error) {
     const message = (error as { message?: unknown }).message;
     if (typeof message === 'string') return message;
@@ -106,9 +111,7 @@ export const useAuthStore = create<AuthState>()(
           }
         } catch (err: unknown) {
           const errorMsg = getErrorMessage(err, 'Erro ao fazer login');
-          if (!errorMsg.includes('Invalid') && !errorMsg.includes('credentials')) {
-            set({ error: errorMsg });
-          }
+          set({ error: errorMsg });
           throw err;
         } finally {
           set({ isLoading: false });
