@@ -1,7 +1,10 @@
 import { createClient } from '@neondatabase/neon-js';
 
 function normalizeNeonUrl(url: string) {
-  return url.replace('.neon.build/', '.neon.tech/');
+  const trimmedUrl = url.trim();
+  const extractedUrl = trimmedUrl.match(/https?:\/\/\S+/)?.[0] || trimmedUrl;
+
+  return extractedUrl.replace('.neon.build/', '.neon.tech/');
 }
 
 const neonAuthUrl = normalizeNeonUrl(import.meta.env.VITE_NEON_AUTH_URL || '');
