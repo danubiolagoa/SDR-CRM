@@ -417,15 +417,15 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
           messages: [
             {
               role: 'system',
-              content: 'You are an expert sales copywriter for B2B outbound. You write personalized, engaging cold messages that feel human-written. You understand Brazilian Portuguese business context.'
+              content: 'You are an expert sales copywriter for B2B outbound in Brazil. Return only valid JSON. Do not use markdown, explanations, numbering, or text outside JSON.'
             },
             {
               role: 'user',
               content: prompt
             }
           ],
-          max_tokens: 500,
-          temperature: 0.8,
+          max_tokens: 900,
+          temperature: 0.6,
         }),
       });
 
@@ -436,9 +436,11 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       }
 
       const data = await response.json();
-      // O content já vem correto do OpenRouter
       const generatedText = data.choices?.[0]?.message?.content || '';
       const messages = parseGeneratedMessages(generatedText);
+      if (messages.length === 0) {
+        throw new Error('A IA não retornou mensagens válidas. Tente gerar novamente.');
+      }
 
       // Salvar mensagens no banco
       const { data: leadMessage, error } = await supabase
@@ -529,22 +531,61 @@ Dados do Lead:
 - Telefone: ${lead.phone || 'N/A'}
 - Origem: ${lead.source || 'N/A'}
 
-Gere exatamente 3 mensagens diferentes para abordagem fria B2B em português brasileiro. Cada mensagem deve ter entre 150-280 caracteres. Separe cada mensagem com "---" em uma linha separada. Não inclua numeração ou títulos. Escreva mensagens personalizadas e humanizadas que gerem curiosidade.`;
+Gere exatamente 3 mensagens diferentes para abordagem fria B2B em português brasileiro.
+Cada mensagem deve ter entre 150 e 280 caracteres.
+Escreva mensagens personalizadas, humanizadas e que gerem curiosidade.
+
+Responda somente com JSON válido neste formato exato:
+{
+  "messages": [
+    "mensagem 1",
+    "mensagem 2",
+    "mensagem 3"
+  ]
+}`;
 }
 
 function parseGeneratedMessages(text: string): { id: string; text: string }[] {
-  // Normalizar: remover quebras de linha extras ao redor do ---
-  const normalized = text.replace(/\n\s*\n\s*---/g, '\n---\n').replace(/---\n\s*\n/g, '---\n');
-  const parts = normalized.split('---').map(s => s.trim()).filter(s => s.length > 0);
+  const cleanText = text
+    .replace(/^```(?:json)?/i, '')
+    .replace(/```$/i, '')
+    .trim();
 
-  if (parts.length === 0 || parts.length === 1) {
-    // Se só tem uma parte ou nenhuma, retornar o texto como está
-    const cleanText = text.replace(/^[\s\n]+|[\s\n]+$/g, '').trim();
-    return [{ id: crypto.randomUUID(), text: cleanText }];
+  const jsonMatch = cleanText.match(/\{[\s\S]*\}/);
+  const jsonCandidate = jsonMatch?.[0] || cleanText;
+
+  try {
+    const parsed = JSON.parse(jsonCandidate) as { messages?: unknown } | unknown[];
+    const rawMessages = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray(parsed.messages)
+        ? parsed.messages
+        : [];
+
+    return normalizeGeneratedMessages(rawMessages);
+  } catch {
+    const fallbackParts = cleanText
+      .split(/\n\s*---\s*\n|(?:^|\n)\s*\d+[).:-]\s+/)
+      .map(part => part.trim())
+      .filter(Boolean);
+
+    return normalizeGeneratedMessages(fallbackParts.length > 1 ? fallbackParts : [cleanText]);
   }
+}
 
-  return parts.slice(0, 3).map(part => ({
-    id: crypto.randomUUID(),
-    text: part.replace(/^\d+[).]\s*/, '').trim(),
-  }));
+function normalizeGeneratedMessages(messages: unknown[]): { id: string; text: string }[] {
+  return messages
+    .map(message => typeof message === 'string' ? message : '')
+    .map(message => message
+      .replace(/^["'\s]+|["'\s]+$/g, '')
+      .replace(/^\d+[).:-]\s*/, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    )
+    .filter(message => message.length >= 20)
+    .slice(0, 3)
+    .map(message => ({
+      id: crypto.randomUUID(),
+      text: message,
+    }));
 }

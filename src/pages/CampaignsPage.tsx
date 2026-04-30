@@ -246,15 +246,13 @@ export function CampaignsPage() {
             </div>
 
             <div className="space-y-4">
-              <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm">
-                <pre className="text-gray-100 whitespace-pre-wrap leading-relaxed">
-                  {currentMessages.messages.map((msg, i) => (
-                    <div key={msg.id || i} className="mb-4 last:mb-0">
-                      <span className="text-indigo-400 mr-2">{i + 1}.</span>
-                      {msg.text}
-                    </div>
-                  ))}
-                </pre>
+              <div className="bg-gray-900 rounded-xl p-4 font-mono text-sm text-gray-100 space-y-4">
+                {currentMessages.messages.map((msg, i) => (
+                  <div key={msg.id || i} className="flex gap-2 leading-relaxed">
+                    <span className="text-indigo-400 shrink-0">{i + 1}.</span>
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                  </div>
+                ))}
               </div>
 
               <div className="flex gap-2">
