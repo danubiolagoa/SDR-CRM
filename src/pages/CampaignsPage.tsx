@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/authStore';
 import type { Campaign } from '../types';
 import type { FunilEtapa } from '../types';
 import { HashtagInput } from '../components/ui/HashtagInput';
+import { OPENROUTER_MODEL, hasOpenRouterApiKey } from '../lib/openRouter';
 
 export function CampaignsPage() {
   const { workspace } = useAuthStore();
@@ -18,7 +19,7 @@ export function CampaignsPage() {
   const [generatingForLead, setGeneratingForLead] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
-  const hasOpenRouterKey = !!import.meta.env.VITE_OPENROUTER_API_KEY;
+  const hasOpenRouterKey = hasOpenRouterApiKey();
 
   useEffect(() => {
     if (workspace) {
@@ -82,7 +83,7 @@ export function CampaignsPage() {
 
       {!hasOpenRouterKey && (
         <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-700">
-          ⚠️ A API key do OpenRouter não está configurada. Edite o arquivo <code className="bg-amber-100 px-1 rounded">.env.local</code> e adicione <code className="bg-amber-100 px-1 rounded">VITE_OPENROUTER_API_KEY=sua_chave_aqui</code>
+          ⚠️ A API key do OpenRouter não está configurada neste build. No local, use <code className="bg-amber-100 px-1 rounded">.env.local</code>. No Vercel, configure <code className="bg-amber-100 px-1 rounded">VITE_OPENROUTER_API_KEY</code> como environment variable e faça redeploy. Modelo esperado: <code className="bg-amber-100 px-1 rounded">{OPENROUTER_MODEL}</code>
         </div>
       )}
 

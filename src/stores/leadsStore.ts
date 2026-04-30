@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/neon';
+import { OPENROUTER_MODEL, getOpenRouterApiKey } from '../lib/openRouter';
 import { useAuthStore } from './authStore';
 import { DEFAULT_ETAPA_COLORS, getDefaultEtapaColorKey } from '../lib/etapaColors';
 import type { Lead, FunilEtapa, CustomField, LeadMessage, Campaign } from '../types';
@@ -378,9 +379,9 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
   },
 
   generateMessages: async (leadId, campaignId) => {
-    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+    const apiKey = getOpenRouterApiKey();
     if (!apiKey) {
-      throw new Error('API key do OpenRouter não configurada. Adicione VITE_OPENROUTER_API_KEY no arquivo .env.local');
+      throw new Error('API key do OpenRouter não configurada. No local, adicione VITE_OPENROUTER_API_KEY no .env.local. No Vercel, configure a environment variable e faça redeploy.');
     }
 
     set({ isLoading: true });
@@ -406,13 +407,13 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://sdr-crm.app',
+          'HTTP-Referer': window.location.origin,
           'X-Title': 'SDR CRM Message Generator',
         },
         body: JSON.stringify({
-          model: 'minimax/minimax-m2.7',
+          model: OPENROUTER_MODEL,
           messages: [
             {
               role: 'system',
